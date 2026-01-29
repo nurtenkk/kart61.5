@@ -1,0 +1,34 @@
+DELIMITER //
+create procedure KartIslemControl(
+IN p_kart_no VARCHAR(100),
+IN p_miktar DECIMAL(10,2),
+IN p_islem_tipi ENUM('Yukleme', 'Harcama')
+)
+begin 
+declare mevcut_bakiye Decimal(10,2);
+
+DECLARE EXIT HANDLER FOR SQLEXCEPTION 
+BEGIN
+ROLLBACK;
+END;
+start transaction;
+
+select bakiye into mevcut_bakiye from kartlar WHERE kart_no = p_kart_no for update;
+
+    if p_islem_tipi = 'Harcama' then 
+if mevcut_bakiye<p_miktar then 
+rollback;
+SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Yetersiz bakiye! İşlem iptal edildi.';
+        else
+        UPDATE kartlar SET bakiye = bakiye - p_miktar WHERE kart_no = p_kart_no;
+        INSERT INTO IslemGecmisi (kart_no, islem_tipi, miktar) VALUES (p_kart_no, 'Harcama', p_miktar);
+        commit;
+        end if;
+    elseif p_islem_tipi = 'Yukleme' THEN
+    UPDATE kartlar SET bakiye = bakiye + p_miktar WHERE kart_no = p_kart_no;
+    INSERT INTO IslemGecmisi (kart_no, islem_tipi, miktar) VALUES (p_kart_no, 'Yukleme', p_miktar);
+    commit;
+    end if;
+    end //
+    
+    DELIMITER ;
